@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>遗传家系图谱编辑器</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.7.14/dist/vue.js"></script>
+  <script src="https://unpkg.com/konva@9.3.6/konva.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f3f5f9; font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; display: flex; flex-direction: column; min-height: 100vh; }
+    #app { width: 100%; flex: 1; display: flex; flex-direction: column; }
+    
+    .header { padding: 16px 24px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .header h2 { font-weight: 600; font-size: 1.25rem; color: #1e293b; display: flex; align-items: center; gap: 8px; }
+    .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 500; transition: all 0.2s; }
+    .btn-primary { background: #3b82f6; color: white; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-secondary { background: #e2e8f0; color: #334155; }
+    .btn-secondary:hover { background: #cbd5e1; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    
+    .legend-container { padding: 10px 24px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; font-size: 0.75rem; color: #475569; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-shape { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+    .legend-square { width: 16px; height: 16px; border: 2px solid #1e293b; border-radius: 2px; background: white; }
+    .legend-circle { width: 16px; height: 16px; border: 2px solid #1e293b; border-radius: 50%; background: white; }
+    .legend-diamond { width: 16px; height: 16px; background: white; border: 2px solid #1e293b; transform: rotate(45deg); }
+    .legend-filled { background: #1e293b; }
+    .legend-carrier-m { background: linear-gradient(to right, #1e293b 50%, white 50%); }
+    .legend-carrier-f { background: radial-gradient(circle at 50% 50%, #1e293b 45%, white 45%); }
+    
+    .main-content { flex: 1; display: flex; }
+    
+    .canvas-area { flex: 1; padding: 16px; display: flex; justify-content: center; background: white; position: relative; }
+    .konva-wrapper { width: 100%; height: 100%; min-height: 500px; border-radius: 12px; overflow: hidden; background: #fdfdfd; border: 1px solid #e2e8f0; position: relative; }
+    .canvas-controls { position: absolute; bottom: 16px; right: 16px; display: flex; flex-direction: column; gap: 8px; background: rgba(255,255,255,0.95); padding: 8px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .zoom-btn { width: 32px; height: 32px; border: none; background: #f1f5f9; border-radius: 6px; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
+    .zoom-btn:hover { background: #e2e8f0; }
+    .zoom-value { text-align: center; font-size: 0.75rem; color: #64748b; }
+    
+    .sidebar { width: 280px; background: white; border-left: 1px solid #e2e8f0; padding: 16px; overflow-y: auto; }
+    .sidebar-section { margin-bottom: 20px; }
+    .sidebar-title { font-size: 0.875rem; font-weight: 600; color: #334155; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; }
+    .template-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .template-card { padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.2s; text-align: center; }
+    .template-card:hover { border-color: #3b82f6; background: #eff6ff; }
+    .template-card.selected { border-color: #3b82f6; background: #dbeafe; }
+    .template-icon { width: 40px; height: 40px; margin: 0 auto 8px; }
+    .template-name { font-size: 0.75rem; color: #334155; }
+    
+    .member-list { max-height: 200px; overflow-y: auto; }
+    .member-item { padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+    .member-item:hover { background: #f8fafc; }
+    .member-item.selected { border-color: #3b82f6; background: #eff6ff; }
+    .member-shape { width: 20px; height: 20px; }
+    .member-info { flex: 1; }
+    .member-name { font-size: 0.8rem; font-weight: 500; color: #1e293b; }
+    .member-gen { font-size: 0.7rem; color: #64748b; }
+    
+    .action-list { display: flex; flex-direction: column; gap: 6px; }
+    .action-btn { padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: white; cursor: pointer; font-size: 0.8rem; text-align: left; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
+    .action-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+    .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+    .modal { background: white; border-radius: 12px; width: 90%; max-width: 400px; padding: 20px; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-title { font-size: 1.1rem; font-weight: 600; color: #1e293b; }
+    .modal-close { width: 28px; height: 28px; border: none; background: #f1f5f9; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .modal-body { margin-bottom: 20px; }
+    .form-group { margin-bottom: 15px; }
+    .form-label { display: block; font-size: 0.8rem; font-weight: 500; color: #374151; margin-bottom: 6px; }
+    .form-control { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; }
+    .form-control:focus { outline: none; border-color: #3b82f6; }
+    .radio-group { display: flex; gap: 16px; }
+    .radio-label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #374151; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
+    
+    .stats-bar { position: absolute; top: 16px; left: 16px; background: rgba(255,255,255,0.95); padding: 8px 16px; border-radius: 20px; display: flex; gap: 16px; font-size: 0.8rem; color: #475569; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    
+    .tooltip { position: absolute; background: rgba(0,0,0,0.8); color: white; padding: 6px 10px; border-radius: 4px; font-size: 0.75rem; pointer-events: none; z-index: 100; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <h2>🧬 遗传家系图谱编辑器</h2>
+    <div class="header-actions">
+      <button class="btn btn-secondary" @click="showTemplateModal = true">📋 选择模板</button>
+      <button class="btn btn-primary" @click="savePedigree">💾 保存</button>
+      <button class="btn btn-danger" @click="clearAll">🗑️ 清空</button>
+    </div>
+  </div>
+
+  <div class="legend-container">
+    <div class="legend-item"><div class="legend-shape"><div class="legend-square"></div></div> 正常男性</div>
+    <div class="legend-item"><div class="legend-shape"><div class="legend-circle"></div></div> 正常女性</div>
+    <div class="legend-item"><div class="legend-shape"><div class="legend-square legend-carrier-m"></div></div> 携带者男性</div>
+    <div class="legend-item"><div class="legend-shape"><div class="legend-circle legend-carrier-f"></div></div> 携带者女性</div>
+    <div class="legend-item"><div class="legend-shape"><div class="legend-square legend-filled"></div></div> 患者男性</div>
+    <div class="legend-item"><div class="legend-shape"><div class="legend-circle legend-filled"></div></div> 患者女性</div>
+    <div class="legend-item"><div class="legend-shape"><div class="legend-diamond"></div></div> 性别未知</div>
+    <div class="legend-item"><svg width="18" height="18" viewBox="0 0 36 36"><path fill="#b91c1c" d="M22,44C22,44,33,24.2,33,24.2C33,24.2,24.2,17.6,24.2,17.6C24.2,17.6,46.2,13.2,46.2,13.2C46.2,13.2,52.47,34.87,52.47,34.87C52.47,34.87,42.57,31.02,42.57,31.02C42.57,31.02,31.9,49.5,31.9,49.5" transform="scale(0.5)"/></svg> 先证者</div>
+  </div>
+
+  <div class="main-content">
+    <div class="canvas-area">
+      <div class="stats-bar">
+        <span>👥 {{ members.length }} 成员</span>
+        <span>📅 {{ generationCount }} 代</span>
+        <span>🔗 {{ relations.length }} 关系</span>
+      </div>
+      <div class="konva-wrapper" id="pedigree-container"></div>
+      <div class="canvas-controls">
+        <button class="zoom-btn" @click="zoomIn">➕</button>
+        <div class="zoom-value">{{ Math.round(zoom * 100) }}%</div>
+        <button class="zoom-btn" @click="zoomOut">➖</button>
+        <button class="zoom-btn" @click="resetZoom">⟲</button>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">成员列表</div>
+        <div class="member-list">
+          <div v-for="member in members" :key="member.id" 
+               class="member-item" :class="{ selected: selectedMember?.id === member.id }"
+               @click="selectMember(member)">
+            <div class="member-shape" :style="getMemberShapeStyle(member)"></div>
+            <div class="member-info">
+              <div class="member-name">{{ member.name || '未命名' }}</div>
+              <div class="member-gen">第 {{ member.generation }} 代</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">编辑操作</div>
+        <div class="action-list">
+          <button class="action-btn" @click="showAddSiblingModal = true" :disabled="!selectedMember">
+            👨‍👩‍👧 添加兄弟姐妹
+          </button>
+          <button class="action-btn" @click="showAddSpouseModal = true" :disabled="!selectedMember">
+            💑 添加配偶
+          </button>
+          <button class="action-btn" @click="showAddChildModal = true" :disabled="!canAddChild">
+            👶 添加子代
+          </button>
+          <button class="action-btn" @click="showEditModal = true" :disabled="!selectedMember">
+            ✏️ 编辑成员
+          </button>
+          <button class="action-btn btn-danger" @click="deleteMember" :disabled="!selectedMember">
+            🗑️ 删除成员
+          </button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">提示</div>
+        <div style="font-size: 0.75rem; color: #64748b; line-height: 1.5;">
+          <p>• 点击成员选中</p>
+          <p>• 选择模板快速创建</p>
+          <p>• 添加配偶后可添加子代</p>
+          <p>• 删除成员会连带删除关联关系</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="showTemplateModal" class="modal-overlay" @click.self="showTemplateModal = false">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">选择家系模板</div>
+        <button class="modal-close" @click="showTemplateModal = false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="template-grid">
+          <div class="template-card" @click="loadTemplate('blank')">
+            <div class="template-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </div>
+            <div class="template-name">空白画布</div>
+          </div>
+          <div class="template-card" @click="loadTemplate('proband')">
+            <div class="template-icon">
+              <svg viewBox="0 0 100 100">
+                <rect x="35" y="30" width="30" height="30" fill="white" stroke="#333" stroke-width="2" rx="3"/>
+                <path fill="#b91c1c" d="M25,70 L30,60 L50,65 L70,60 L75,70 L50,85 Z"/>
+                <text x="50" y="88" text-anchor="middle" font-size="10">先证者</text>
+              </svg>
+            </div>
+            <div class="template-name">先证者</div>
+          </div>
+          <div class="template-card" @click="loadTemplate('withParents')">
+            <div class="template-icon">
+              <svg viewBox="0 0 100 120">
+                <rect x="15" y="10" width="25" height="25" fill="white" stroke="#333" stroke-width="2" rx="2"/>
+                <circle cx="67" cy="22" r="12" fill="white" stroke="#333" stroke-width="2"/>
+                <line x1="40" y1="18" x2="55" y2="18" stroke="#333" stroke-width="2"/>
+                <rect x="40" y="55" width="20" height="20" fill="white" stroke="#333" stroke-width="2" rx="2"/>
+                <line x1="50" y1="35" x2="50" y2="55" stroke="#333" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="template-name">带父母的先证者</div>
+          </div>
+          <div class="template-card" @click="loadTemplate('twoGenerations')">
+            <div class="template-icon">
+              <svg viewBox="0 0 120 140">
+                <rect x="10" y="10" width="20" height="20" fill="white" stroke="#333" stroke-width="2"/>
+                <circle cx="40" cy="20" r="10" fill="white" stroke="#333" stroke-width="2"/>
+                <rect x="70" y="10" width="20" height="20" fill="white" stroke="#333" stroke-width="2"/>
+                <circle cx="100" cy="20" r="10" fill="white" stroke="#333" stroke-width="2"/>
+                <line x1="30" y1="18" x2="30" y2="18" stroke="#333" stroke-width="2"/>
+                <line x1="90" y1="18" x2="90" y2="18" stroke="#333" stroke-width="2"/>
+                <rect x="35" y="50" width="20" height="20" fill="white" stroke="#333" stroke-width="2"/>
+                <circle cx="75" cy="60" r="10" fill="white" stroke="#333" stroke-width="2"/>
+                <line x1="55" y1="58" x2="65" y2="58" stroke="#333" stroke-width="2"/>
+                <rect x="50" y="90" width="20" height="20" fill="white" stroke="#333" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="template-name">两代祖先</div>
+          </div>
+          <div class="template-card" @click="loadTemplate('threeGenerations')">
+            <div class="template-icon">
+              <svg viewBox="0 0 140 180">
+                <rect x="5" y="10" width="18" height="18" fill="white" stroke="#333" stroke-width="1.5"/>
+                <circle cx="30" cy="19" r="9" fill="white" stroke="#333" stroke-width="1.5"/>
+                <rect x="50" y="10" width="18" height="18" fill="white" stroke="#333" stroke-width="1.5"/>
+                <circle cx="75" cy="19" r="9" fill="white" stroke="#333" stroke-width="1.5"/>
+                <rect x="95" y="10" width="18" height="18" fill="white" stroke="#333" stroke-width="1.5"/>
+                <circle cx="120" cy="19" r="9" fill="white" stroke="#333" stroke-width="1.5"/>
+                <rect x="35" y="50" width="18" height="18" fill="white" stroke="#333" stroke-width="1.5"/>
+                <circle cx="60" cy="59" r="9" fill="white" stroke="#333" stroke-width="1.5"/>
+                <rect x="80" y="50" width="18" height="18" fill="white" stroke="#333" stroke-width="1.5"/>
+                <circle cx="105" cy="59" r="9" fill="white" stroke="#333" stroke-width="1.5"/>
+                <rect x="50" y="95" width="18" height="18" fill="white" stroke="#333" stroke-width="1.5"/>
+                <circle cx="75" cy="104" r="9" fill="white" stroke="#333" stroke-width="1.5"/>
+                <rect x="62" y="140" width="18" height="18" fill="white" stroke="#333" stroke-width="1.5"/>
+              </svg>
+            </div>
+            <div class="template-name">三代祖先</div>
+          </div>
+          <div class="template-card" @click="loadTemplate('consanguineous')">
+            <div class="template-icon">
+              <svg viewBox="0 0 120 160">
+                <rect x="45" y="10" width="20" height="20" fill="white" stroke="#333" stroke-width="2"/>
+                <circle cx="75" cy="20" r="10" fill="white" stroke="#333" stroke-width="2"/>
+                <line x1="65" y1="18" x2="65" y2="18" stroke="#333" stroke-width="2"/>
+                <rect x="15" y="55" width="18" height="18" fill="white" stroke="#333" stroke-width="2"/>
+                <circle cx="40" cy="64" r="9" fill="white" stroke="#333" stroke-width="2"/>
+                <rect x="70" y="55" width="18" height="18" fill="white" stroke="#333" stroke-width="2"/>
+                <circle cx="95" cy="64" r="9" fill="white" stroke="#333" stroke-width="2"/>
+                <rect x="25" y="100" width="18" height="18" fill="white" stroke="#333" stroke-width="2"/>
+                <circle cx="80" cy="109" r="9" fill="white" stroke="#333" stroke-width="2"/>
+                <rect x="50" y="140" width="18" height="18" fill="white" stroke="#333" stroke-width="2"/>
+                <line x1="65" y1="30" x2="35" y2="55" stroke="#333" stroke-width="2"/>
+                <line x1="65" y1="30" x2="85" y2="55" stroke="#333" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="template-name">血缘婚姻-表亲</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="showAddSiblingModal" class="modal-overlay" @click.self="showAddSiblingModal = false">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">添加兄弟姐妹</div>
+        <button class="modal-close" @click="showAddSiblingModal = false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">性别</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" v-model="newSibling.gender" :value="1"> 男</label>
+            <label class="radio-label"><input type="radio" v-model="newSibling.gender" :value="2"> 女</label>
+            <label class="radio-label"><input type="radio" v-model="newSibling.gender" :value="0"> 未知</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">姓名</label>
+          <input type="text" class="form-control" v-model="newSibling.name" placeholder="输入姓名">
+        </div>
+        <div class="form-group">
+          <label class="form-label">健康状态</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" v-model="newSibling.healthStatus" :value="1"> 正常</label>
+            <label class="radio-label"><input type="radio" v-model="newSibling.healthStatus" :value="2"> 携带者</label>
+            <label class="radio-label"><input type="radio" v-model="newSibling.healthStatus" :value="3"> 患病</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="radio-label"><input type="checkbox" v-model="newSibling.isProband"> 设为先证者</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" @click="showAddSiblingModal = false">取消</button>
+        <button class="btn btn-primary" @click="addSibling">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="showAddSpouseModal" class="modal-overlay" @click.self="showAddSpouseModal = false">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">添加配偶</div>
+        <button class="modal-close" @click="showAddSpouseModal = false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">性别</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" v-model="newSpouse.gender" :value="1"> 男</label>
+            <label class="radio-label"><input type="radio" v-model="newSpouse.gender" :value="2"> 女</label>
+            <label class="radio-label"><input type="radio" v-model="newSpouse.gender" :value="0"> 未知</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">姓名</label>
+          <input type="text" class="form-control" v-model="newSpouse.name" placeholder="输入姓名">
+        </div>
+        <div class="form-group">
+          <label class="form-label">健康状态</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" v-model="newSpouse.healthStatus" :value="1"> 正常</label>
+            <label class="radio-label"><input type="radio" v-model="newSpouse.healthStatus" :value="2"> 携带者</label>
+            <label class="radio-label"><input type="radio" v-model="newSpouse.healthStatus" :value="3"> 患病</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" @click="showAddSpouseModal = false">取消</button>
+        <button class="btn btn-primary" @click="addSpouse">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="showAddChildModal" class="modal-overlay" @click.self="showAddChildModal = false">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">添加子代</div>
+        <button class="modal-close" @click="showAddChildModal = false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">选择父母</label>
+          <select class="form-control" v-model="newChild.parent1Id">
+            <option value="">选择父亲</option>
+            <option v-for="m in members.filter(m => m.gender === 1)" :key="m.id" :value="m.id">{{ m.name || '成员' + m.id }}</option>
+          </select>
+          <select class="form-control" v-model="newChild.parent2Id" style="margin-top: 8px;">
+            <option value="">选择母亲</option>
+            <option v-for="m in members.filter(m => m.gender === 2)" :key="m.id" :value="m.id">{{ m.name || '成员' + m.id }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">性别</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" v-model="newChild.gender" :value="1"> 男</label>
+            <label class="radio-label"><input type="radio" v-model="newChild.gender" :value="2"> 女</label>
+            <label class="radio-label"><input type="radio" v-model="newChild.gender" :value="0"> 未知</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">姓名</label>
+          <input type="text" class="form-control" v-model="newChild.name" placeholder="输入姓名">
+        </div>
+        <div class="form-group">
+          <label class="form-label">健康状态</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" v-model="newChild.healthStatus" :value="1"> 正常</label>
+            <label class="radio-label"><input type="radio" v-model="newChild.healthStatus" :value="2"> 携带者</label>
+            <label class="radio-label"><input type="radio" v-model="newChild.healthStatus" :value="3"> 患病</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="radio-label"><input type="checkbox" v-model="newChild.isProband"> 设为先证者</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" @click="showAddChildModal = false">取消</button>
+        <button class="btn btn-primary" @click="addChild">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="showEditModal" class="modal-overlay" @click.self="showEditModal = false">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">编辑成员</div>
+        <button class="modal-close" @click="showEditModal = false">×</button>
+      </div>
+      <div class="modal-body" v-if="selectedMember">
+        <div class="form-group">
+          <label class="form-label">姓名</label>
+          <input type="text" class="form-control" v-model="editMember.name" placeholder="输入姓名">
+        </div>
+        <div class="form-group">
+          <label class="form-label">性别</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" v-model="editMember.gender" :value="1"> 男</label>
+            <label class="radio-label"><input type="radio" v-model="editMember.gender" :value="2"> 女</label>
+            <label class="radio-label"><input type="radio" v-model="editMember.gender" :value="0"> 未知</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">健康状态</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" v-model="editMember.healthStatus" :value="1"> 正常</label>
+            <label class="radio-label"><input type="radio" v-model="editMember.healthStatus" :value="2"> 携带者</label>
+            <label class="radio-label"><input type="radio" v-model="editMember.healthStatus" :value="3"> 患病</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="radio-label"><input type="checkbox" v-model="editMember.isProband"> 设为先证者</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" @click="showEditModal = false">取消</button>
+        <button class="btn btn-primary" @click="saveEdit">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+new Vue({
+  el: '#app',
+  data: {
+    members: [],
+    relations: [],
+    selectedMember: null,
+    stage: null,
+    layer: null,
+    nodeSize: 32,
+    zoom: 1,
+    showTemplateModal: false,
+    showAddSiblingModal: false,
+    showAddSpouseModal: false,
+    showAddChildModal: false,
+    showEditModal: false,
+    newSibling: { name: '', gender: 1, healthStatus: 1, isProband: false },
+    newSpouse: { name: '', gender: 2, healthStatus: 1 },
+    newChild: { parent1Id: '', parent2Id: '', name: '', gender: 1, healthStatus: 1, isProband: false },
+    editMember: { name: '', gender: 1, healthStatus: 1, isProband: false },
+    nextMemberId: 1000,
+    nextRelationId: 100
+  },
+  computed: {
+    generationCount() {
+      if (!this.members.length) return 0;
+      return Math.max(...this.members.map(m => m.generation));
+    },
+    canAddChild() {
+      const spousePairs = this.getSpousePairs();
+      return spousePairs.length > 0;
+    }
+  },
+  mounted() {
+    this.initStage();
+    this.loadTemplate('proband');
+  },
+  methods: {
+    initStage() {
+      const container = document.getElementById('pedigree-container');
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      this.stage = new Konva.Stage({
+        container: 'pedigree-container',
+        width: rect.width,
+        height: rect.height
+      });
+      this.layer = new Konva.Layer();
+      this.stage.add(this.layer);
+      
+      window.addEventListener('resize', this.handleResize);
+      this.stage.on('click', (e) => {
+        if (e.target === this.stage) {
+          this.selectedMember = null;
+        }
+      });
+    },
+    handleResize() {
+      const container = document.getElementById('pedigree-container');
+      if (container && this.stage) {
+        const rect = container.getBoundingClientRect();
+        this.stage.width(rect.width);
+        this.stage.height(rect.height);
+        this.drawPedigree();
+      }
+    },
+    getMemberShapeStyle(member) {
+      const style = {};
+      if (member.gender === 1) {
+        style.borderRadius = '2px';
+        style.border = '2px solid #1e293b';
+        style.width = '16px';
+        style.height = '16px';
+      } else if (member.gender === 2) {
+        style.borderRadius = '50%';
+        style.border = '2px solid #1e293b';
+        style.width = '16px';
+        style.height = '16px';
+      } else {
+        style.borderRadius = '0';
+        style.border = '2px solid #1e293b';
+        style.width = '16px';
+        style.height = '16px';
+        style.transform = 'rotate(45deg)';
+      }
+      
+      if (member.healthStatus === 3) {
+        style.background = '#1e293b';
+      } else if (member.healthStatus === 2) {
+        if (member.gender === 1) {
+          style.background = 'linear-gradient(to right, #1e293b 50%, white 50%)';
+        } else if (member.gender === 2) {
+          style.background = 'radial-gradient(circle at 50% 50%, #1e293b 45%, white 45%)';
+        } else {
+          style.background = 'linear-gradient(to right, #1e293b 50%, white 50%)';
+        }
+      } else {
+        style.background = 'white';
+      }
+      return style;
+    },
+    selectMember(member) {
+      this.selectedMember = member;
+    },
+    loadTemplate(template) {
+      const templates = {
+        blank: { members: [], relations: [] },
+        proband: {
+          members: [{ id: 1, name: '先证者', gender: 1, generation: 1, healthStatus: 1, isProband: 1, positionX: 400, positionY: 300 }],
+          relations: []
+        },
+        withParents: {
+          members: [
+            { id: 2, name: '父亲', gender: 1, generation: 1, healthStatus: 1, isProband: 0, positionX: 350, positionY: 150 },
+            { id: 3, name: '母亲', gender: 2, generation: 1, healthStatus: 1, isProband: 0, positionX: 450, positionY: 150 },
+            { id: 1, name: '先证者', gender: 1, generation: 2, healthStatus: 1, isProband: 1, positionX: 400, positionY: 300 }
+          ],
+          relations: [
+            { id: 1, relationType: 1, fromMemberId: 2, toMemberId: 3 },
+            { id: 2, relationType: 2, fromMemberId: 2, toMemberId: 1 },
+            { id: 3, relationType: 2, fromMemberId: 3, toMemberId: 1 }
+          ]
+        },
+        twoGenerations: {
+          members: [
+            { id: 4, name: '', gender: 1, generation: 1, healthStatus: 1, isProband: 0, positionX: 250, positionY: 80 },
+            { id: 5, name: '', gender: 2, generation: 1, healthStatus: 1, isProband: 0, positionX: 330, positionY: 80 },
+            { id: 6, name: '', gender: 1, generation: 1, healthStatus: 1, isProband: 0, positionX: 470, positionY: 80 },
+            { id: 7, name: '', gender: 2, generation: 1, healthStatus: 1, isProband: 0, positionX: 550, positionY: 80 },
+            { id: 2, name: '父亲', gender: 1, generation: 2, healthStatus: 1, isProband: 0, positionX: 360, positionY: 220 },
+            { id: 3, name: '母亲', gender: 2, generation: 2, healthStatus: 1, isProband: 0, positionX: 440, positionY: 220 },
+            { id: 1, name: '先证者', gender: 1, generation: 3, healthStatus: 1, isProband: 1, positionX: 400, positionY: 360 }
+          ],
+          relations: [
+            { id: 1, relationType: 1, fromMemberId: 4, toMemberId: 5 },
+            { id: 2, relationType: 1, fromMemberId: 6, toMemberId: 7 },
+            { id: 3, relationType: 1, fromMemberId: 2, toMemberId: 3 },
+            { id: 4, relationType: 2, fromMemberId: 4, toMemberId: 2 },
+            { id: 5, relationType: 2, fromMemberId: 5, toMemberId: 2 },
+            { id: 6, relationType: 2, fromMemberId: 6, toMemberId: 3 },
+            { id: 7, relationType: 2, fromMemberId: 7, toMemberId: 3 },
+            { id: 8, relationType: 2, fromMemberId: 2, toMemberId: 1 },
+            { id: 9, relationType: 2, fromMemberId: 3, toMemberId: 1 }
+          ]
+        },
+        threeGenerations: {
+          members: [
+            { id: 8, name: '', gender: 1, generation: 1, healthStatus: 1, isProband: 0, positionX: 120, positionY: 60 },
+            { id: 9, name: '', gender: 2, generation: 1, healthStatus: 1, isProband: 0, positionX: 200, positionY: 60 },
+            { id: 10, name: '', gender: 1, generation: 1, healthStatus: 1, isProband: 0, positionX: 360, positionY: 60 },
+            { id: 11, name: '', gender: 2, generation: 1, healthStatus: 1, isProband: 0, positionX: 440, positionY: 60 },
+            { id: 12, name: '', gender: 1, generation: 1, healthStatus: 1, isProband: 0, positionX: 600, positionY: 60 },
+            { id: 13, name: '', gender: 2, generation: 1, healthStatus: 1, isProband: 0, positionX: 680, positionY: 60 },
+            { id: 4, name: '', gender: 1, generation: 2, healthStatus: 1, isProband: 0, positionX: 360, positionY: 180 },
+            { id: 5, name: '', gender: 2, generation: 2, healthStatus: 1, isProband: 0, positionX: 440, positionY: 180 },
+            { id: 6, name: '', gender: 1, generation: 2, healthStatus: 1, isProband: 0, positionX: 640, positionY: 180 },
+            { id: 7, name: '', gender: 2, generation: 2, healthStatus: 1, isProband: 0, positionX: 720, positionY: 180 },
+            { id: 2, name: '父亲', gender: 1, generation: 3, healthStatus: 1, isProband: 0, positionX: 520, positionY: 320 },
+            { id: 3, name: '母亲', gender: 2, generation: 3, healthStatus: 1, isProband: 0, positionX: 600, positionY: 320 },
+            { id: 1, name: '先证者', gender: 1, generation: 4, healthStatus: 1, isProband: 1, positionX: 560, positionY: 460 }
+          ],
+          relations: [
+            { id: 1, relationType: 1, fromMemberId: 8, toMemberId: 9 },
+            { id: 2, relationType: 1, fromMemberId: 10, toMemberId: 11 },
+            { id: 3, relationType: 1, fromMemberId: 12, toMemberId: 13 },
+            { id: 4, relationType: 1, fromMemberId: 4, toMemberId: 5 },
+            { id: 5, relationType: 1, fromMemberId: 6, toMemberId: 7 },
+            { id: 6, relationType: 1, fromMemberId: 2, toMemberId: 3 },
+            { id: 7, relationType: 2, fromMemberId: 8, toMemberId: 4 },
+            { id: 8, relationType: 2, fromMemberId: 9, toMemberId: 4 },
+            { id: 9, relationType: 2, fromMemberId: 10, toMemberId: 5 },
+            { id: 10, relationType: 2, fromMemberId: 11, toMemberId: 5 },
+            { id: 11, relationType: 2, fromMemberId: 12, toMemberId: 6 },
+            { id: 12, relationType: 2, fromMemberId: 13, toMemberId: 6 },
+            { id: 13, relationType: 2, fromMemberId: 4, toMemberId: 2 },
+            { id: 14, relationType: 2, fromMemberId: 5, toMemberId: 2 },
+            { id: 15, relationType: 2, fromMemberId: 6, toMemberId: 3 },
+            { id: 16, relationType: 2, fromMemberId: 7, toMemberId: 3 },
+            { id: 17, relationType: 2, fromMemberId: 2, toMemberId: 1 },
+            { id: 18, relationType: 2, fromMemberId: 3, toMemberId: 1 }
+          ]
+        },
+        consanguineous: {
+          members: [
+            { id: 4, name: '', gender: 1, generation: 1, healthStatus: 1, isProband: 0, positionX: 360, positionY: 60 },
+            { id: 5, name: '', gender: 2, generation: 1, healthStatus: 1, isProband: 0, positionX: 440, positionY: 60 },
+            { id: 6, name: '', gender: 1, generation: 2, healthStatus: 1, isProband: 0, positionX: 240, positionY: 180 },
+            { id: 7, name: '', gender: 2, generation: 2, healthStatus: 1, isProband: 0, positionX: 320, positionY: 180 },
+            { id: 8, name: '', gender: 1, generation: 2, healthStatus: 1, isProband: 0, positionX: 480, positionY: 180 },
+            { id: 9, name: '', gender: 2, generation: 2, healthStatus: 1, isProband: 0, positionX: 560, positionY: 180 },
+            { id: 2, name: '父亲', gender: 1, generation: 3, healthStatus: 1, isProband: 0, positionX: 280, positionY: 320 },
+            { id: 3, name: '母亲', gender: 2, generation: 3, healthStatus: 1, isProband: 0, positionX: 520, positionY: 320 },
+            { id: 1, name: '先证者', gender: 1, generation: 4, healthStatus: 1, isProband: 1, positionX: 400, positionY: 460 }
+          ],
+          relations: [
+            { id: 1, relationType: 1, fromMemberId: 4, toMemberId: 5 },
+            { id: 2, relationType: 1, fromMemberId: 6, toMemberId: 7 },
+            { id: 3, relationType: 1, fromMemberId: 8, toMemberId: 9 },
+            { id: 4, relationType: 1, fromMemberId: 2, toMemberId: 3 },
+            { id: 5, relationType: 2, fromMemberId: 4, toMemberId: 7 },
+            { id: 6, relationType: 2, fromMemberId: 5, toMemberId: 7 },
+            { id: 7, relationType: 2, fromMemberId: 4, toMemberId: 8 },
+            { id: 8, relationType: 2, fromMemberId: 5, toMemberId: 8 },
+            { id: 9, relationType: 2, fromMemberId: 6, toMemberId: 2 },
+            { id: 10, relationType: 2, fromMemberId: 7, toMemberId: 2 },
+            { id: 11, relationType: 2, fromMemberId: 8, toMemberId: 3 },
+            { id: 12, relationType: 2, fromMemberId: 9, toMemberId: 3 },
+            { id: 13, relationType: 2, fromMemberId: 2, toMemberId: 1 },
+            { id: 14, relationType: 2, fromMemberId: 3, toMemberId: 1 }
+          ]
+        }
+      };
+      
+      const data = templates[template];
+      this.members = JSON.parse(JSON.stringify(data.members));
+      this.relations = JSON.parse(JSON.stringify(data.relations));
+      this.selectedMember = null;
+      this.nextMemberId = 1000;
+      this.nextRelationId = 100;
+      this.drawPedigree();
+      this.showTemplateModal = false;
+    },
+    getSpousePairs() {
+      const spouseRelations = this.relations.filter(r => r.relationType === 1);
+      const pairs = [];
+      spouseRelations.forEach(r => {
+        const m1 = this.members.find(m => m.id === r.fromMemberId);
+        const m2 = this.members.find(m => m.id === r.toMemberId);
+        if (m1 && m2) {
+          pairs.push({ m1, m2, relation: r });
+        }
+      });
+      return pairs;
+    },
+    getMemberById(id) {
+      return this.members.find(m => m.id === parseInt(id));
+    },
+    getSiblings(member) {
+      const parentRelations = this.relations.filter(r => r.relationType === 2 && r.toMemberId === member.id);
+      const parentIds = parentRelations.map(r => r.fromMemberId);
+      if (parentIds.length === 0) return [];
+      
+      const siblings = [];
+      this.relations.filter(r => r.relationType === 2 && parentIds.includes(r.fromMemberId)).forEach(r => {
+        const sibling = this.getMemberById(r.toMemberId);
+        if (sibling && sibling.id !== member.id && !siblings.includes(sibling)) {
+          siblings.push(sibling);
+        }
+      });
+      return siblings;
+    },
+    addSibling() {
+      if (!this.selectedMember) return;
+      
+      const siblings = this.getSiblings(this.selectedMember);
+      const parentIds = this.relations
+        .filter(r => r.relationType === 2 && r.toMemberId === this.selectedMember.id)
+        .map(r => r.fromMemberId);
+      
+      const generation = this.selectedMember.generation;
+      const genMembers = this.members.filter(m => m.generation === generation);
+      const maxX = Math.max(...genMembers.map(m => m.positionX), 0);
+      const newX = maxX + 80;
+      
+      const newMember = {
+        id: this.nextMemberId++,
+        name: this.newSibling.name || '兄弟姐妹',
+        gender: parseInt(this.newSibling.gender),
+        generation: generation,
+        healthStatus: parseInt(this.newSibling.healthStatus),
+        isProband: this.newSibling.isProband ? 1 : 0,
+        positionX: newX,
+        positionY: this.selectedMember.positionY
+      };
+      
+      this.members.push(newMember);
+      
+      parentIds.forEach(parentId => {
+        this.relations.push({
+          id: this.nextRelationId++,
+          relationType: 2,
+          fromMemberId: parentId,
+          toMemberId: newMember.id
+        });
+      });
+      
+      this.newSibling = { name: '', gender: 1, healthStatus: 1, isProband: false };
+      this.showAddSiblingModal = false;
+      this.drawPedigree();
+    },
+    addSpouse() {
+      if (!this.selectedMember) return;
+      
+      const existingSpouse = this.relations.find(
+        r => r.relationType === 1 && (r.fromMemberId === this.selectedMember.id || r.toMemberId === this.selectedMember.id)
+      );
+      if (existingSpouse) {
+        alert('该成员已有配偶');
+        return;
+      }
+      
+      const spouseX = this.selectedMember.gender === 1 
+        ? this.selectedMember.positionX + 80 
+        : this.selectedMember.positionX - 80;
+      
+      const newMember = {
+        id: this.nextMemberId++,
+        name: this.newSpouse.name || '配偶',
+        gender: parseInt(this.newSpouse.gender),
+        generation: this.selectedMember.generation,
+        healthStatus: parseInt(this.newSpouse.healthStatus),
+        isProband: 0,
+        positionX: spouseX,
+        positionY: this.selectedMember.positionY
+      };
+      
+      this.members.push(newMember);
+      
+      this.relations.push({
+        id: this.nextRelationId++,
+        relationType: 1,
+        fromMemberId: Math.min(this.selectedMember.id, newMember.id),
+        toMemberId: Math.max(this.selectedMember.id, newMember.id)
+      });
+      
+      this.newSpouse = { name: '', gender: this.selectedMember.gender === 1 ? 2 : 1, healthStatus: 1 };
+      this.showAddSpouseModal = false;
+      this.drawPedigree();
+    },
+    addChild() {
+      const parent1 = this.getMemberById(this.newChild.parent1Id);
+      const parent2 = this.getMemberById(this.newChild.parent2Id);
+      
+      if (!parent1 && !parent2) {
+        alert('请至少选择一位父母');
+        return;
+      }
+      
+      const parents = [parent1, parent2].filter(Boolean);
+      const avgX = parents.reduce((sum, p) => sum + p.positionX, 0) / parents.length;
+      const maxGen = Math.max(...this.members.map(m => m.generation));
+      
+      const newMember = {
+        id: this.nextMemberId++,
+        name: this.newChild.name || '子女',
+        gender: parseInt(this.newChild.gender),
+        generation: maxGen + 1,
+        healthStatus: parseInt(this.newChild.healthStatus),
+        isProband: this.newChild.isProband ? 1 : 0,
+        positionX: avgX,
+        positionY: (maxGen + 1) * 140
+      };
+      
+      this.members.push(newMember);
+      
+      parents.forEach(parent => {
+        this.relations.push({
+          id: this.nextRelationId++,
+          relationType: 2,
+          fromMemberId: parent.id,
+          toMemberId: newMember.id
+        });
+      });
+      
+      if (parent1 && parent2 && !this.relations.find(
+        r => r.relationType === 1 && 
+        ((r.fromMemberId === parent1.id && r.toMemberId === parent2.id) ||
+         (r.fromMemberId === parent2.id && r.toMemberId === parent1.id))
+      )) {
+        this.relations.push({
+          id: this.nextRelationId++,
+          relationType: 1,
+          fromMemberId: Math.min(parent1.id, parent2.id),
+          toMemberId: Math.max(parent1.id, parent2.id)
+        });
+      }
+      
+      this.newChild = { parent1Id: '', parent2Id: '', name: '', gender: 1, healthStatus: 1, isProband: false };
+      this.showAddChildModal = false;
+      this.drawPedigree();
+    },
+    deleteMember() {
+      if (!this.selectedMember) return;
+      
+      const memberId = this.selectedMember.id;
+      
+      const relatedMemberIds = new Set();
+      this.relations.forEach(r => {
+        if (r.fromMemberId === memberId) relatedMemberIds.add(r.toMemberId);
+        if (r.toMemberId === memberId) relatedMemberIds.add(r.fromMemberId);
+      });
+      
+      this.members = this.members.filter(m => m.id !== memberId);
+      this.relations = this.relations.filter(
+        r => r.fromMemberId !== memberId && r.toMemberId !== memberId
+      );
+      
+      this.selectedMember = null;
+      this.drawPedigree();
+    },
+    saveEdit() {
+      if (!this.selectedMember) return;
+      
+      const member = this.members.find(m => m.id === this.selectedMember.id);
+      if (member) {
+        member.name = this.editMember.name;
+        member.gender = parseInt(this.editMember.gender);
+        member.healthStatus = parseInt(this.editMember.healthStatus);
+        member.isProband = this.editMember.isProband ? 1 : 0;
+      }
+      
+      this.showEditModal = false;
+      this.drawPedigree();
+    },
+    clearAll() {
+      if (!confirm('确定要清空所有数据吗？')) return;
+      this.members = [];
+      this.relations = [];
+      this.selectedMember = null;
+      this.drawPedigree();
+    },
+    savePedigree() {
+      const data = { members: this.members, relations: this.relations };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pedigree.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    zoomIn() {
+      this.zoom = Math.min(this.zoom + 0.1, 2);
+      this.updateZoom();
+    },
+    zoomOut() {
+      this.zoom = Math.max(this.zoom - 0.1, 0.2);
+      this.updateZoom();
+    },
+    resetZoom() {
+      this.zoom = 1;
+      this.updateZoom();
+    },
+    updateZoom() {
+      if (this.stage) {
+        this.stage.scale({ x: this.zoom, y: this.zoom });
+        this.layer.batchDraw();
+      }
+    },
+    drawPedigree() {
+      if (!this.layer) return;
+      
+      this.layer.destroyChildren();
+      
+      const memberMap = {};
+      this.members.forEach(m => memberMap[m.id] = m);
+      
+      const generations = [...new Set(this.members.map(m => m.generation))].sort((a, b) => a - b);
+      const romans = ['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ', 'Ⅶ'];
+      generations.forEach(gen => {
+        const memberInGen = this.members.find(m => m.generation === gen);
+        if (memberInGen) {
+          this.addText(romans[gen - 1] || gen.toString(), 35, memberInGen.positionY - 20, 16, '#64748b', true);
+        }
+      });
+      
+      const spousePairs = [];
+      this.relations.filter(r => r.relationType === 1).forEach(r => {
+        const m1 = memberMap[r.fromMemberId];
+        const m2 = memberMap[r.toMemberId];
+        if (m1 && m2) {
+          this.addLine(m1.positionX, m1.positionY, m2.positionX, m2.positionY, '#1e293b', 2.5);
+          spousePairs.push({ m1, m2 });
+        }
+      });
+      
+      const parentToChildren = {};
+      const childParents = {};
+      this.relations.filter(r => r.relationType === 2).forEach(r => {
+        if (!parentToChildren[r.fromMemberId]) parentToChildren[r.fromMemberId] = [];
+        parentToChildren[r.fromMemberId].push(r.toMemberId);
+        if (!childParents[r.toMemberId]) childParents[r.toMemberId] = [];
+        childParents[r.toMemberId].push(r.fromMemberId);
+      });
+      
+      const processedChildren = new Set();
+      
+      spousePairs.forEach(pair => {
+        const children1 = parentToChildren[pair.m1.id] || [];
+        const children2 = parentToChildren[pair.m2.id] || [];
+        const commonChildrenIds = children1.filter(cid => children2.includes(cid));
+        
+        if (commonChildrenIds.length === 0) return;
+        
+        const childMembers = commonChildrenIds.map(id => memberMap[id]).filter(Boolean);
+        if (childMembers.length === 0) return;
+        
+        const midX = (pair.m1.positionX + pair.m2.positionX) / 2;
+        const midY = pair.m1.positionY;
+        const minChildY = Math.min(...childMembers.map(c => c.positionY));
+        const childLineY = minChildY - this.nodeSize - 10;
+        
+        this.addLine(midX, midY, midX, childLineY, '#1e293b', 2.5);
+        
+        const childXs = childMembers.map(c => c.positionX);
+        const minX = Math.min(...childXs);
+        const maxX = Math.max(...childXs);
+        
+        if (maxX > minX) {
+          this.addLine(minX, childLineY, maxX, childLineY, '#1e293b', 2.5);
+        }
+        
+        childMembers.forEach(child => {
+          const targetY = child.positionY - this.nodeSize / 2;
+          this.addLine(child.positionX, childLineY, child.positionX, targetY, '#1e293b', 2.5);
+          processedChildren.add(child.id);
+        });
+      });
+      
+      Object.keys(childParents).forEach(childId => {
+        const child = memberMap[childId];
+        if (!child || processedChildren.has(child.id)) return;
+        
+        const parents = childParents[childId];
+        if (parents && parents.length) {
+          parents.forEach(pid => {
+            const parent = memberMap[pid];
+            if (parent) {
+              const endY = child.positionY - this.nodeSize / 2;
+              this.addLine(parent.positionX, parent.positionY, child.positionX, endY, '#1e293b', 2.0);
+            }
+          });
+        }
+      });
+      
+      this.members.forEach(m => {
+        this.drawSymbol(m.positionX, m.positionY, this.nodeSize, m.gender, m.healthStatus, m.name || m.id.toString());
+        if (m.isProband === 1) {
+          const iconX = m.positionX - this.nodeSize / 2 - 8;
+          const iconY = m.positionY + this.nodeSize / 2 - 4;
+          this.drawProbandIcon(iconX, iconY);
+        }
+      });
+
+      this.layer.batchDraw();
+    },
+    drawSymbol(x, y, size, gender, healthStatus, label) {
+      const half = size / 2;
+      const isCarrier = healthStatus === 2;
+      const isAffected = healthStatus === 3;
+      
+      if (gender === 0 || (gender !== 1 && gender !== 2)) {
+        const diamond = new Konva.RegularPolygon({
+          x, y,
+          sides: 4,
+          radius: half,
+          fill: isAffected ? '#1e293b' : '#ffffff',
+          stroke: '#1e293b',
+          strokeWidth: 2.5,
+          rotation: 45
+        });
+        this.layer.add(diamond);
+        
+        if (isCarrier) {
+          const halfDiamond = new Konva.Shape({
+            x: x - half, y: y - half,
+            width: size, height: size,
+            sceneFunc: function(ctx) {
+              ctx.beginPath();
+              ctx.moveTo(size/2, 0);
+              ctx.lineTo(size, size/2);
+              ctx.lineTo(size/2, size);
+              ctx.lineTo(0, size/2);
+              ctx.closePath();
+              ctx.fillStyle = '#ffffff';
+              ctx.fill();
+              ctx.beginPath();
+              ctx.moveTo(size/2, 0);
+              ctx.lineTo(size/2, size);
+              ctx.lineTo(0, size/2);
+              ctx.closePath();
+              ctx.fillStyle = '#1e293b';
+              ctx.fill();
+              ctx.beginPath();
+              ctx.moveTo(size/2, 0);
+              ctx.lineTo(size, size/2);
+              ctx.lineTo(size/2, size);
+              ctx.lineTo(0, size/2);
+              ctx.closePath();
+              ctx.strokeStyle = '#1e293b';
+              ctx.lineWidth = 2.5;
+              ctx.stroke();
+            }
+          });
+          this.layer.add(halfDiamond);
+        }
+      } else {
+        const isMale = gender === 1;
+        
+        if (isCarrier) {
+          if (isMale) {
+            this.layer.add(new Konva.Shape({
+              x: x - half, y: y - half,
+              width: size, height: size,
+              sceneFunc: function(ctx) {
+                ctx.beginPath();
+                ctx.rect(0, 0, size, size);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.rect(0, 0, size/2, size);
+                ctx.fillStyle = '#1e293b';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.rect(0, 0, size, size);
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+              }
+            }));
+          } else {
+            this.layer.add(new Konva.Shape({
+              x: x - half, y: y - half,
+              width: size, height: size,
+              sceneFunc: function(ctx) {
+                ctx.beginPath();
+                ctx.arc(size/2, size/2, half, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(size/2, size/2, half, Math.PI/2, Math.PI * 1.5, false);
+                ctx.closePath();
+                ctx.fillStyle = '#1e293b';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(size/2, size/2, half, 0, Math.PI * 2);
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+              }
+            }));
+          }
+        } else {
+          const shape = isMale ?
+            new Konva.Rect({
+              x: x - half, y: y - half,
+              width: size, height: size,
+              fill: isAffected ? '#1e293b' : '#ffffff',
+              stroke: '#1e293b',
+              strokeWidth: 2.5,
+              cornerRadius: 4
+            }) :
+            new Konva.Circle({
+              x, y,
+              radius: half,
+              fill: isAffected ? '#1e293b' : '#ffffff',
+              stroke: '#1e293b',
+              strokeWidth: 2.5
+            });
+          this.layer.add(shape);
+        }
+      }
+      
+      this.addText(label, x, y + half + 16, 11, '#334155');
+    },
+    drawProbandIcon(x, y) {
+      const probandPath = 'M22,44C22,44,33,24.2,33,24.2C33,24.2,24.2,17.6,24.2,17.6C24.2,17.6,46.2,13.2,46.2,13.2C46.2,13.2,52.47,34.87,52.47,34.87C52.47,34.87,42.57,31.02,42.57,31.02C42.57,31.02,31.9,49.5,31.9,49.5';
+      this.layer.add(new Konva.Path({
+        x, y,
+        data: probandPath,
+        fill: '#b91c1c',
+        scaleX: 0.3,
+        scaleY: 0.3
+      }));
+    },
+    addLine(x1, y1, x2, y2, color, width) {
+      this.layer.add(new Konva.Line({
+        points: [x1, y1, x2, y2],
+        stroke: color,
+        strokeWidth: width,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }));
+    },
+    addText(text, x, y, size, color, bold = false) {
+      const t = new Konva.Text({
+        x, y,
+        text,
+        fontSize: size,
+        fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
+        fill: color,
+        fontStyle: bold ? 'bold' : 'normal',
+        align: 'center'
+      });
+      t.offsetX(t.width() / 2);
+      t.offsetY(t.height() / 2);
+      this.layer.add(t);
+    }
+  }
+});
+</script>
+</body>
+</html>
