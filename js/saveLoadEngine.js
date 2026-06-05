@@ -411,7 +411,7 @@ var ProbandDataLoader = Class['create']({
         _0x4ea3cc = $('infoPedigreeNameInput'),
         _0xb6a887 = $('infoPedigreeName'),
         _0x84ad4c = $('pedigreeNameEditBtn')
-        // _0x471f5b = $('pedigreeInfoBar')['select']('.pedigree-name-item')[0x0];
+        _0x471f5b = $('pedigreeInfoBar')['select']('.pedigree-name-item')[0x0];
     if (!_0x4ea3cc || !_0xb6a887) {
         console['log']('[PedigreeName] Elements not found, skipping init');
         return;
